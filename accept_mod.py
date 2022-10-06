@@ -238,7 +238,6 @@ def read_runlist(params):
             for k in range(1, n_scans - 1):
                 if lines[i+k+1][0] != 8192:
                     if obsid_start <= int(obsid) <= obsid_stop:
-                        # print(obsid_start, int(obsid), obsid_stop)
                         o_scans.append(lines[i+k+1][0])
                         n_scans_tot += 1
             scans[obsid] = o_scans
@@ -270,90 +269,103 @@ def extract_data_from_array(data, stats_string):
 
 def get_scan_stats(filepath, map_grid=None):
     n_stats = len(stats_list)
-    try:
-        with h5py.File(filepath, mode="r") as my_file:
-            tod_ind = np.array(my_file['tod'][:])
-            n_det_ind, n_sb, n_freq, n_samp = tod_ind.shape
-            sb_mean_ind = np.array(my_file['sb_mean'][:])
-            point_tel_ind = np.array(my_file['point_tel'][:])
-            point_radec_ind = np.array(my_file['point_cel'][:])
-            mask_ind = my_file['freqmask'][:]
-            mask_full_ind = my_file['freqmask_full'][:]
-            reason_ind = my_file['freqmask_reason'][:]
-            sigma0_ind = my_file['sigma0'][()]
-            n_nan_ind = my_file['n_nan'][()]
+    # try:
+    with h5py.File(filepath, mode="r") as my_file:
+        tod_ind = np.array(my_file['tod'][:])
+        n_det_ind, n_sb, n_freq, n_samp = tod_ind.shape
+        sb_mean_ind = np.array(my_file['sb_mean'][:])
+        point_tel_ind = np.array(my_file['point_tel'][:])
+        point_radec_ind = np.array(my_file['point_cel'][:])
+        # mask_ind = my_file['freqmask'][:]
+        # mask_full_ind = my_file['freqmask_full'][:]
+        mask_ind = my_file['freqmask'][:]
+        mask_full_ind = my_file['freqmask_full'][:]
+        reason_ind = my_file['freqmask_reason'][:]
+        sigma0_ind = my_file['sigma0'][()]
+        # n_nan_ind = my_file['n_nan'][()]
+        # n_nan_ind = my_file['n_nans'][()]
 
-            pixels = np.array(my_file['pixels'][:]) - 1 
-            pix2ind = my_file['pix2ind'][:]
-            scanid = my_file['scanid'][()]
-            feat = my_file['feature'][()]
-            
-            
-            airtemp = np.mean(my_file['hk_airtemp'][()])
-            dewtemp = np.mean(my_file['hk_dewtemp'][()])
-            humidity = np.mean(my_file['hk_humidity'][()])
-            pressure = np.mean(my_file['hk_pressure'][()])
-            rain = np.mean(my_file['hk_rain'][()])
-            winddir = np.mean(my_file['hk_winddir'][()])
-            windspeed = np.mean(my_file['hk_windspeed'][()])
-            
-            try:
-                point_amp_ind = np.nanmean(my_file['el_az_stats'][()], axis=3) #### mean over chunk axis
-            except:
-                point_amp_ind = np.zeros((n_det_ind, n_sb, 1024, 2))
-            try: 
-                sd_ind = np.array(my_file['spike_data'])
-                if (sd_ind.shape[0] == 0):
-                    sd_ind = np.zeros((3, n_det_ind, n_sb, 4, 1000))
-            except:
-                sd_ind = np.zeros((3, n_det_ind, n_sb, 4, 1000))
-            try:
-                use_freq_filter = my_file['use_freq_filter'][()]
-                if not use_freq_filter:
-                    tod_poly_ind = my_file['tod_poly'][()]
-                else:
-                    tod_poly_ind = np.zeros((n_det_ind, n_sb, 2, n_samp))
-            except KeyError:
-                tod_poly_ind = np.zeros((n_det_ind, n_sb, 2, n_samp))
-            try: 
-                chi2_ind = np.array(my_file['chi2'])
-            except KeyError:
-                chi2_ind = np.zeros_like(tod_ind[:,:,:,0])
-            try:
-                acc_ind = np.array(my_file['acceptrate'])
-            except KeyError:
-                acc_ind = np.zeros_like(tod_ind[:,:,0,0])
-                print("Found no acceptrate")
-            time = np.array(my_file['time'])
-            mjd = time
-            try:
-                pca = np.array(my_file['pca_comp'])
-                eigv = np.array(my_file['pca_eigv'])
-                ampl_ind = np.array(my_file['pca_ampl'])
-            except KeyError:
-                pca = np.zeros((4, 10000))
-                eigv = np.zeros(0)
-                ampl_ind = np.zeros((4, *mask_full_ind.shape))
-                print('Found no pca comps', scanid)
-            try:
-                tsys_ind = np.array(my_file['Tsys_lowres'])
-            except KeyError:
-                tsys_ind = np.zeros_like(tod_ind[:,:,:,0]) + 40
-                print("Found no tsys")
-    except KeyboardInterrupt:
-        sys.exit()
-    except:
-        print('Could not load file', filepath, 'returning nans')
-        data = np.zeros((20, 4, n_stats), dtype=np.float32)
-        data[:] = np.nan
-        indices = np.zeros((20, 2, 2)).astype(int)
-        map_list = [[None for _ in range(4)] for _ in range(20)]
+        # pixels = np.array(my_file['pixels'][:]) - 1 
+        pixels = np.array(my_file['feeds'][:]) - 1 
+        # pix2ind = my_file['pix2ind'][:]
+        pix2ind = my_file['pix2ind_fortran'][:]
+        scanid = my_file['scanid'][()]
+        feat = my_file['feature'][()]
         
-        return data, [map_list, indices]
+        
+        airtemp = np.mean(my_file['hk_airtemp'][()])
+        dewtemp = np.mean(my_file['hk_dewtemp'][()])
+        humidity = np.mean(my_file['hk_humidity'][()])
+        pressure = np.mean(my_file['hk_pressure'][()])
+        rain = np.mean(my_file['hk_rain'][()])
+        winddir = np.mean(my_file['hk_winddir'][()])
+        windspeed = np.mean(my_file['hk_windspeed'][()])
+        
+        # try:
+        point_amp_ind = my_file['el_az_amp'][:,:,:,:2]
+            # point_amp_ind = np.nanmean(my_file['el_az_stats'][()], axis=3) #### mean over chunk axis
+            # 3, 19, 4, 1024 => 19, 4, 1024, 2
+        # except:
+        #     point_amp_ind = np.zeros((n_det_ind, n_sb, 1024, 2))
+        try: 
+            sd_ind = np.array(my_file['spike_data'])
+            if (sd_ind.shape[0] == 0):
+                sd_ind = np.zeros((3, n_det_ind, n_sb, 4, 1000))
+        except:
+            sd_ind = np.zeros((3, n_det_ind, n_sb, 4, 1000))
+        # use_freq_filter = my_file['use_freq_filter'][()]
+        # if not use_freq_filter:
+            # tod_poly_ind = my_file['tod_poly'][()]
+        # try:
+        if "poly_coeff" in my_file:
+            tod_poly_ind = np.transpose(my_file['poly_coeff'][()], (1,2,0,3))
+        else:
+            tod_poly_ind = np.zeros((n_det_ind, n_sb, 2, n_samp))
+        # except KeyError:
+        #     tod_poly_ind = np.zeros((n_det_ind, n_sb, 2, n_samp))
+        # try: 
+        chi2_ind = np.array(my_file['chi2'])
+        # except KeyError:
+        #     chi2_ind = np.zeros_like(tod_ind[:,:,:,0])
+        try:
+            acc_ind = np.array(my_file['acceptrate'])
+        except KeyError:
+            acc_ind = np.zeros_like(tod_ind[:,:,0,0])
+            print("Found no acceptrate")
+        time = np.array(my_file['tod_time'])
+        mjd = time
+        try:
+            pca = np.array(my_file['pca_comp'])
+            # eigv = np.array(my_file['pca_eigv'])
+            ampl_ind = np.array(my_file['pca_ampl'])
+        except KeyError:
+            pca = np.zeros((4, 10000))
+            # eigv = np.zeros(0)
+            ampl_ind = np.zeros((4, *mask_full_ind.shape))
+            print('Found no pca comps', scanid)
+        try:
+            # tsys_ind = np.array(my_file['Tsys_lowres'])
+            tsys = np.array(my_file['Tsys'])
+            tsys_ind = np.zeros((tsys.shape[0], 4, 64))
+            for i in range(64):
+                tsys_ind[:,:,i] = np.sqrt(16.0/np.nansum(1.0/tsys_ind[:,:,16*i:16*(i+1)], axis=-1)**2)
+        except KeyError:
+            tsys_ind = np.zeros_like(tod_ind[:,:,:,0]) + 40
+            print("Found no tsys")
+    # except KeyboardInterrupt:
+    #     sys.exit()
+    # except:
+    #     print('Could not load file', filepath, 'returning nans')
+    #     data = np.zeros((20, 4, n_stats), dtype=np.float32)
+    #     data[:] = np.nan
+    #     indices = np.zeros((20, 2, 2)).astype(int)
+    #     map_list = [[None for _ in range(4)] for _ in range(20)]
+        
+    #     return data, [map_list, indices]
 
     t0 = time[0]
     time = (time - time[0]) * (24 * 60)  # minutes
-
+ 
     obsid = int(str(scanid)[:-2])
 
     n_freq_hr = len(mask_full_ind[0,0])
@@ -365,7 +377,7 @@ def get_scan_stats(filepath, map_grid=None):
     tod = np.zeros((n_det, n_sb, n_freq, n_samp))
     mask = np.zeros((n_det, n_sb, n_freq))
     mask_full = np.zeros((n_det, n_sb, n_freq_hr))
-    n_nan = np.zeros((n_det, n_sb, n_freq_hr))
+    # n_nan = np.zeros((n_det, n_sb, n_freq_hr))
     acc = np.zeros((n_det, n_sb))
     ampl = np.zeros((4, n_det, n_sb, n_freq_hr))
     tsys = np.zeros((n_det, n_sb, n_freq))
@@ -382,7 +394,7 @@ def get_scan_stats(filepath, map_grid=None):
     tod[pixels] = tod_ind
     mask[pixels] = mask_ind
     mask_full[pixels] = mask_full_ind
-    n_nan[pixels] = n_nan_ind
+    # n_nan[pixels] = n_nan_ind
     reason[pixels] = reason_ind
     acc[pixels] = acc_ind
     ampl[:, pixels, :, :] = ampl_ind
@@ -393,8 +405,8 @@ def get_scan_stats(filepath, map_grid=None):
     sigma0[pixels] = sigma0_ind
     point_amp[pixels] = point_amp_ind
     tod_poly[pixels] = tod_poly_ind
-    point_tel[pixels] = point_tel_ind
-    point_radec[pixels] = point_radec_ind
+    point_tel[pixels,:,:2] = point_tel_ind
+    point_radec[pixels,:,:2] = point_radec_ind
 
     az_amp = point_amp[:, :, :, 1]
     el_amp = point_amp[:, :, :, 0]
@@ -473,7 +485,7 @@ def get_scan_stats(filepath, map_grid=None):
     insert_data_in_array(data, mean_el, 'el')
 
     # chi2 
-    chi2_sb = np.sum(chi2, axis=2)
+    chi2_sb = np.nansum(chi2, axis=2)
     n_freq_sb = np.nansum(mask, axis=2)
     wh = np.where(n_freq_sb != 0.0)
     chi2_sb[wh] = chi2_sb[wh] / np.sqrt(n_freq_sb[wh])
@@ -538,10 +550,10 @@ def get_scan_stats(filepath, map_grid=None):
 
     # number of nans
     where = (mask_sb_sum > 0)
-    n_nan_sb = np.zeros_like(mask_sb_sum)
-    n_nan_sb[where] = (n_nan * mask_full).sum(2)[where] / mask_sb_sum[where]
+    # n_nan_sb = np.zeros_like(mask_sb_sum)
+    # n_nan_sb[where] = (n_nan * mask_full).sum(2)[where] / mask_sb_sum[where]
 
-    insert_data_in_array(data, n_nan_sb, 'n_nan')
+    # insert_data_in_array(data, n_nan_sb, 'n_nan')
     
     # tsys averaged over sb
     insert_data_in_array(data, tsys_sb, 'tsys')
@@ -1390,7 +1402,6 @@ def read_jk_param(filepath):
 
 
 def make_jk_list(params, accept_list, scan_list, scan_data, jk_param):
-    # print("hei", accept_list.shape, np.any(accept_list)) 
     strings, types, n_split = read_jk_param(jk_param)
     
     cutoff_list = np.zeros((n_split-1), dtype='f')
@@ -1408,7 +1419,6 @@ def make_jk_list(params, accept_list, scan_list, scan_data, jk_param):
     # insert 0 on rejected sidebands, add 1 on accepted 
     jk_list[np.invert(accept_list)] = 0
     jk_list[accept_list] += 1 
-    # print("hei", jk_list, cutoff_list, strings) 
     return jk_list, cutoff_list, strings
 
 
@@ -1605,7 +1615,6 @@ if __name__ == "__main__":
         print('Saved scan data')
         accept_list, reject_reason, acc = make_accept_list(params, accept_params, scan_data)
         print('Made accept list')
-        print(len(make_jk_list(params, accept_list, scan_list, scan_data, jk_param_list_file)))
         jk_list, cutoff_list, split_list = make_jk_list(params, accept_list, scan_list, scan_data, jk_param_list_file)
         print('Made jk_list')
         jk_data_name = save_jk_2_h5(params, scan_list, acc, accept_list, reject_reason, jk_list, cutoff_list, split_list, fieldname, runid)
