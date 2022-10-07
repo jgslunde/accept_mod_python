@@ -26,7 +26,12 @@ import warnings
 import shutil
 warnings.filterwarnings("ignore", message="invalid value encountered in true_divide")
 warnings.filterwarnings("ignore", message="invalid value encountered in power")
+warnings.filterwarnings("ignore", message="invalid value encountered in double_scalars")
+warnings.filterwarnings("ignore", message="invalid value encountered in multiply")
+warnings.filterwarnings("ignore", message="Mean of empty slice.")
+warnings.filterwarnings("ignore", message="Mean of empty slice")
 warnings.filterwarnings("ignore", message="divide by zero encountered in true_divide")
+warnings.filterwarnings("ignore", message="Covariance of the parameters could not be estimated")
 os.environ["OMP_NUM_THREADS"] = "1"
 
 class spike_data():
@@ -272,6 +277,7 @@ def get_scan_stats(filepath, map_grid=None):
     # try:
     with h5py.File(filepath, mode="r") as my_file:
         tod_ind = np.array(my_file['tod'][:])
+        # print(np.sum(np.isfinite(tod_ind)), np.size(tod_ind), tod_ind.shape)
         n_det_ind, n_sb, n_freq, n_samp = tod_ind.shape
         sb_mean_ind = np.array(my_file['sb_mean'][:])
         point_tel_ind = np.array(my_file['point_tel'][:])
@@ -344,11 +350,7 @@ def get_scan_stats(filepath, map_grid=None):
             ampl_ind = np.zeros((4, *mask_full_ind.shape))
             print('Found no pca comps', scanid)
         try:
-            # tsys_ind = np.array(my_file['Tsys_lowres'])
-            tsys = np.array(my_file['Tsys'])
-            tsys_ind = np.zeros((tsys.shape[0], 4, 64))
-            for i in range(64):
-                tsys_ind[:,:,i] = np.sqrt(16.0/np.nansum(1.0/tsys_ind[:,:,16*i:16*(i+1)], axis=-1)**2)
+            tsys_ind = np.array(my_file['Tsys_lowres'])
         except KeyError:
             tsys_ind = np.zeros_like(tod_ind[:,:,:,0]) + 40
             print("Found no tsys")
@@ -412,20 +414,20 @@ def get_scan_stats(filepath, map_grid=None):
     el_amp = point_amp[:, :, :, 0]
 
 
-    mask_sum = mask_full.reshape((n_det, n_sb, n_freq, 16)).sum(3)
+    mask_sum = np.nansum(mask_full.reshape((n_det, n_sb, n_freq, 16)), axis=3)
     az_amp = az_amp * mask_full
     el_amp = el_amp * mask_full
 
-    az_amp_lowres = az_amp.reshape((n_det, n_sb, n_freq, 16)).sum(3) / mask_sum
+    az_amp_lowres = np.nansum(az_amp.reshape((n_det, n_sb, n_freq, 16)), axis=3) / mask_sum
     
-    el_amp_lowres = el_amp.reshape((n_det, n_sb, n_freq, 16)).sum(3) / mask_sum
+    el_amp_lowres = np.nansum(el_amp.reshape((n_det, n_sb, n_freq, 16)), axis=3) / mask_sum
 
-    mask_sb_sum = mask_full.sum(2)
+    mask_sb_sum = np.nansum(mask_full, axis=2)
     where = (mask_sb_sum > 0)
     az_amp_sb = np.zeros_like(mask_sb_sum)
     el_amp_sb = np.zeros_like(mask_sb_sum)
-    az_amp_sb[where] = az_amp.sum(2)[where] / mask_sb_sum[where]
-    el_amp_sb[where] = el_amp.sum(2)[where] / mask_sb_sum[where]
+    az_amp_sb[where] = np.nansum(az_amp, axis=2)[where] / mask_sb_sum[where]
+    el_amp_sb[where] = np.nansum(el_amp, axis=2)[where] / mask_sb_sum[where]
 
     my_spikes = get_spike_list(sb_mean, sd, str(scanid), mjd)
     sortedlists = my_spikes.sorted()
@@ -439,12 +441,12 @@ def get_scan_stats(filepath, map_grid=None):
     n_jumps_sb = (np.array([s.sbs for s in sortedlists[1]]) > 0.0015 * n_sigma_spikes).sum(0)
     n_anom_sb = (np.array([s.sbs for s in sortedlists[2]]) > 0.0015 * n_sigma_spikes).sum(0)
     
-    mask_sb_sum_lowres = mask.sum(2)
-    tsys_sb = (tsys * mask).sum(2) / mask_sb_sum_lowres
+    mask_sb_sum_lowres = np.nansum(mask, axis=2)
+    tsys_sb = np.nansum((tsys * mask), axis=2) / mask_sb_sum_lowres
 
     dt = (time[1] - time[0]) * 60  # seconds
     radiometer = 1 / np.sqrt(31.25 * 10 ** 6 * dt)
-    ampl = np.abs(ampl).mean(3)
+    ampl = np.nanmean(np.abs(ampl), axis=3)
     ampl = 100 * np.sqrt(ampl ** 2 * pca.std(1)[:, None, None] ** 2 / radiometer ** 2)
     ampl[np.where(ampl == 0)] = np.nan
 
@@ -510,7 +512,7 @@ def get_scan_stats(filepath, map_grid=None):
             if acc[i, j]:
                 freq_chi2 = np.zeros(n_freq)
                 for k in range(n_freq): 
-                    if mask[i, j, k] == 1.0:
+                    if mask[i, j, k]:
                         histsum, bins = np.histogram(az[i], bins=nbins, weights=(tod[i, j, k]/sigma0[i,j,k]))
                         nhit = np.histogram(az[i], bins=nbins)[0]
                         normhist = histsum / nhit * np.sqrt(nhit)
@@ -698,7 +700,8 @@ def get_scan_stats(filepath, map_grid=None):
                 for l in range(2):
                     sigma_poly[i,j,l], fknee_poly[i,j,l], alpha_poly[i,j,l] = get_noise_params(tod_poly[i,j,l])
                     if np.isinf(sigma_poly[i,j,l]):
-                        print('unable to fit noise params', scanid, i, j, l)
+                        pass
+                        # print('unable to fit noise params', scanid, i, j, l)
                     elif np.isnan(sigma_poly[i,j,l]):
                         print('nan in timestream', scanid, i, j, l)
 
