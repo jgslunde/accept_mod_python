@@ -24,6 +24,7 @@ import multiprocessing
 import importlib
 import warnings
 import shutil
+from tqdm import trange, tqdm
 warnings.filterwarnings("ignore", message="invalid value encountered in true_divide")
 warnings.filterwarnings("ignore", message="invalid value encountered in power")
 warnings.filterwarnings("ignore", message="invalid value encountered in double_scalars")
@@ -277,6 +278,7 @@ def get_scan_stats(filepath, map_grid=None):
     # try:
     with h5py.File(filepath, mode="r") as my_file:
         tod_ind = np.array(my_file['tod'][:])
+        tod_ind[~np.isfinite(tod_ind)] = 0
         # print(np.sum(np.isfinite(tod_ind)), np.size(tod_ind), tod_ind.shape)
         n_det_ind, n_sb, n_freq, n_samp = tod_ind.shape
         sb_mean_ind = np.array(my_file['sb_mean'][:])
@@ -727,7 +729,8 @@ def get_scan_stats(filepath, map_grid=None):
                 power_mean[i,j] = np.mean(sb_mean[i,j])
                 sigma_mean[i,j], fknee_mean[i,j], alpha_mean[i,j] = get_noise_params(sb_mean[i,j])
                 if np.isinf(sigma_mean[i,j]):
-                    print('unable to fit noise params', scanid, i, j)
+                    pass
+                    # print('unable to fit noise params', scanid, i, j)
                 elif np.isnan(sigma_mean[i,j]):
                     print(np.argwhere(np.isnan(sb_mean[i,j])))
                     print('nan in timestream', scanid, i, j)
@@ -965,7 +968,7 @@ def get_scan_data(params, fields, fieldname, paralellize=True):
             obsid_infos.append(obsid_info)
             scan_list[i_scan:i_scan+n_scans] = scans
             i_scan += n_scans
-        scan_data_list = list(pool.map(get_obsid_data, obsid_infos, chunksize=1))
+        scan_data_list = list(tqdm(pool.imap(get_obsid_data, obsid_infos, chunksize=1), total=len(obsid_infos)))
         print('Done with parallell')
         i = 0
         i_scan = 0
